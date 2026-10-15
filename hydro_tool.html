@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hydrological Model Performance Calculator – Free Online Tool</title>
+<meta name="description" content="Free tool to evaluate hydrological model performance: NSE, RMSE, R², KGE, PBIAS, Index of Agreement and Pearson r with charts. Runs entirely in your browser.">
+<style>
+:root{--navy:#1F4E78;--gold:#BF8F00;--light:#DDEBF7;--input:#FFF2CC;--obs:#2E75B6;--sim:#C0392B;--grey:#595959}
+*{box-sizing:border-box}
+body{margin:0;font-family:Segoe UI,Calibri,Arial,sans-serif;background:#f4f6f9;color:#222}
+header{background:var(--navy);color:#fff;padding:18px 24px}
+header h1{margin:0;font-size:22px}
+header p{margin:4px 0 0;opacity:.85;font-size:14px}
+main{max-width:1300px;margin:0 auto;padding:18px}
+.card{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12);padding:16px;margin-bottom:16px}
+h2{font-size:17px;color:var(--navy);margin:0 0 10px}
+.grid-in{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+textarea{width:100%;height:230px;font-family:Consolas,monospace;font-size:13px;background:var(--input);border:1px solid #d6c27a;border-radius:6px;padding:8px;resize:vertical}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button,.filebtn{background:var(--navy);color:#fff;border:0;border-radius:5px;padding:9px 16px;font-size:14px;cursor:pointer}
+button.alt,.filebtn{background:#fff;color:var(--navy);border:1px solid var(--navy)}
+button.go{background:var(--gold);font-weight:bold;font-size:15px}
+button:hover,.filebtn:hover{opacity:.9}
+.filebtn input{display:none}
+label.opt{display:block;margin:6px 0;font-size:14px}
+input[type=number]{width:90px;padding:4px}
+.help{font-size:13px;color:var(--grey);line-height:1.5}
+.help code{background:#eee;padding:1px 4px;border-radius:3px}
+#msg{margin-top:8px;font-size:14px}
+#msg.err{color:#C00000}#msg.ok{color:#2e7d32}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{background:var(--light);border-radius:6px;text-align:center;overflow:hidden}
+.kpi .l{background:var(--navy);color:#fff;font-size:13px;font-weight:bold;padding:6px}
+.kpi .v{font-size:24px;font-weight:bold;padding:8px 4px 2px}
+.kpi .r{font-size:12px;padding:0 4px 8px;color:var(--grey)}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}
+.chart{background:#fff;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.12);padding:8px}
+.chart svg{width:100%;height:auto;display:block}
+.chart .dl{font-size:12px;text-align:right}
+.chart .dl a{color:var(--navy);cursor:pointer;text-decoration:underline}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{background:var(--navy);color:#fff;padding:6px;text-align:left}
+td{border-bottom:1px solid #e3e3e3;padding:6px}
+td.num{text-align:center;font-weight:bold}
+.VG{color:#1b7e2a}.G{color:#5a9e1b}.S{color:#b8860b}.U{color:#C00000}
+footer{text-align:center;font-size:12px;color:var(--grey);padding:20px}
+@media(max-width:800px){.grid-in{grid-template-columns:1fr}.charts{grid-template-columns:1fr}}
+@media print{.noprint{display:none}body{background:#fff}}
+</style>
+</head>
+<body>
+<header>
+<h1>Hydrological Model Performance Calculator</h1>
+<p>Free · No sign-up · Your data never leaves your computer (all calculations run in your browser)</p><p style="margin-top:6px;font-weight:bold">Prepared by Engr. Arup Chakraborty, Executive Engineer, BWDB</p>
+</header>
+<main>
+<div class="card noprint">
+<h2>1 · Input data</h2>
+<div class="grid-in">
+<div>
+<textarea id="data" spellcheck="false" placeholder="Paste two columns here (copy straight from Excel):&#10;Observed&#9;Simulated&#10;30.35&#9;30.50&#10;25.84&#9;31.00&#10;...&#10;&#10;Leave Observed blank (or -999) where data is missing."></textarea>
+<div class="btns">
+<button class="go" onclick="run()">▶ Calculate</button>
+<button class="alt" onclick="loadSample()">Load sample data</button>
+<label class="filebtn">Open CSV / TXT<input type="file" accept=".csv,.txt,.tsv" onchange="loadFile(this)"></label>
+<button class="alt" onclick="clearAll()">Clear</button>
+</div>
+<div id="msg"></div>
+</div>
+<div>
+<label class="opt">Missing-value code for Observed: <input type="number" id="miss" value="-999"></label>
+<label class="opt"><input type="checkbox" id="neg" checked> Treat negative observed values as missing</label>
+<label class="opt"><input type="checkbox" id="moriasi"> PBIAS sign: Moriasi convention (Obs − Sim)<br><span class="help">Unticked: (Sim − Obs) → positive = overestimation</span></label>
+<div class="help">
+<b>How to use</b><br>
+1. Copy the Observed and Simulated columns from Excel and paste them in the yellow box (column 1 = Observed, column 2 = Simulated). A header row is skipped automatically.<br>
+2. Click <b>Calculate</b>.<br>
+3. Time steps with missing observed data (blank, text, <code>-999</code> or negative) are excluded; the simulated series is still drawn on the hydrograph.<br>
+Separators accepted: tab, comma, semicolon or space.
+</div>
+</div>
+</div>
+</div>
+
+<div id="results" style="display:none">
+<div class="card">
+<h2>2 · Results <span class="help" id="npts"></span></h2>
+<div class="kpis" id="kpis"></div>
+<div class="btns noprint">
+<button class="alt" onclick="downloadCSV()">⬇ Download results (CSV)</button>
+<button class="alt" onclick="window.print()">🖨 Print / Save as PDF</button>
+</div>
+</div>
+<div class="charts" id="charts"></div>
+<div class="card" style="margin-top:16px">
+<h2>3 · Formulas used</h2>
+<table>
+<tr><th>Metric</th><th>Formula</th><th>Ideal</th></tr>
+<tr><td>NSE</td><td>1 − Σ(S−O)² / Σ(O−Ō)²</td><td>1</td></tr>
+<tr><td>RMSE</td><td>√[ Σ(S−O)² / n ]</td><td>0</td></tr>
+<tr><td>R²</td><td>(Pearson r)² – regression R², does not detect bias</td><td>1</td></tr>
+<tr><td>KGE (Gupta et al., 2009)</td><td>1 − √[(r−1)² + (α−1)² + (β−1)²], α = σ<sub>S</sub>/σ<sub>O</sub>, β = μ<sub>S</sub>/μ<sub>O</sub></td><td>1</td></tr>
+<tr><td>PBIAS (%)</td><td>100 × Σ(S−O) / ΣO  (or Σ(O−S)/ΣO with Moriasi option)</td><td>0</td></tr>
+<tr><td>Index of Agreement d (Willmott, 1981)</td><td>1 − Σ(S−O)² / Σ(|S−Ō| + |O−Ō|)²</td><td>1</td></tr>
+<tr><td>Pearson r</td><td>cov(O,S) / (σ<sub>O</sub> σ<sub>S</sub>)</td><td>1</td></tr>
+</table>
+<p class="help">Ratings for NSE and PBIAS follow Moriasi et al. (2007) guidance for monthly streamflow and are indicative only. O = observed, S = simulated, n = number of valid pairs. Sample standard deviation (n−1) is used for KGE.</p>
+</div>
+</div>
+</main>
+<footer>Hydrological Model Performance Calculator · Prepared by Engr. Arup Chakraborty, Executive Engineer, BWDB · Free to use and share · Calculations identical to the companion Excel workbook (Hydrological_Model_Performance.xlsx)</footer>
+<script>
+// Hydrological model performance metrics (shared by web page and tests)
+function parseColumn(txt){
+  return txt.split(/\r?\n/).map(s=>s.trim().replace(/,/g,''));
+}
+function toNum(s){ if(s===undefined||s===null) return NaN; s=String(s).trim().replace(/[\s,\u00a0]/g,'').replace(/^"|"$/g,''); if(s==='') return NaN; const v=Number(s); return isFinite(v)?v:NaN; }
+function pairData(obsRaw, simRaw, missingCode){
+  const n=Math.max(obsRaw.length, simRaw.length);
+  const rows=[];
+  for(let i=0;i<n;i++){
+    const o=toNum(obsRaw[i]), s=toNum(simRaw[i]);
+    const oValid = !isNaN(o) && o>=0 && !(missingCode!==null && o===missingCode);
+    rows.push({t:i+1, o: oValid?o:null, s: isNaN(s)?null:s});
+  }
+  // trim trailing fully-empty rows
+  while(rows.length && rows[rows.length-1].o===null && rows[rows.length-1].s===null) rows.pop();
+  return rows;
+}
+const mean=a=>a.reduce((x,y)=>x+y,0)/a.length;
+const sum=a=>a.reduce((x,y)=>x+y,0);
+function sd(a){const m=mean(a);return Math.sqrt(a.reduce((x,y)=>x+(y-m)**2,0)/(a.length-1));}
+function corr(a,b){const ma=mean(a),mb=mean(b);let sab=0,saa=0,sbb=0;for(let i=0;i<a.length;i++){const da=a[i]-ma,db=b[i]-mb;sab+=da*db;saa+=da*da;sbb+=db*db;}return sab/Math.sqrt(saa*sbb);}
+function computeMetrics(rows){
+  const p=rows.filter(r=>r.o!==null && r.s!==null);
+  const o=p.map(r=>r.o), s=p.map(r=>r.s), n=o.length;
+  if(n<2) return {n, error:'At least 2 valid observed/simulated pairs are needed.'};
+  const mo=mean(o), ms=mean(s);
+  let sse=0, sst=0, den=0;
+  for(let i=0;i<n;i++){sse+=(s[i]-o[i])**2; sst+=(o[i]-mo)**2; den+=(Math.abs(s[i]-mo)+Math.abs(o[i]-mo))**2;}
+  const r=corr(o,s), alpha=sd(s)/sd(o), beta=ms/mo;
+  return {
+    n, sumO:sum(o), sumS:sum(s), r, alpha, beta,
+    NSE: 1-sse/sst,
+    RMSE: Math.sqrt(sse/n),
+    R2: r*r,
+    KGE: 1-Math.sqrt((r-1)**2+(alpha-1)**2+(beta-1)**2),
+    PBIAS: 100*(sum(s)-sum(o))/sum(o),
+    d: 1-sse/den,
+    slope: (function(){const m1=mean(o),m2=mean(s);let a=0,b=0;for(let i=0;i<n;i++){a+=(o[i]-m1)*(s[i]-m2);b+=(o[i]-m1)**2;}return a/b;})(),
+    intercept: null
+  };
+}
+const SAMPLE=`Observed\tSimulated
+30.35382\t30.495
+25.8409\t31
+33.7442\t31.425
+23.59962\t31.4475
+22.72199\t34.0275
+32.69249\t39.7575
+67.7403\t45.62
+35.87514\t60.9925
+111.2475\t97.8675
+293.9157\t126.885
+464.2784\t665.655
+1136.55\t1903.993
+1660.333\t3040.243
+2926.514\t3030.755
+1940.069\t2395.555
+824.002\t1720.748
+357.5262\t1241.59`;
+const $=id=>document.getElementById(id);
+let LAST=null;
+function loadSample(){$('data').value=SAMPLE;run();}
+function clearAll(){$('data').value='';$('results').style.display='none';$('msg').textContent='';}
+function loadFile(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{$('data').value=e.target.result;run();};r.readAsText(f);inp.value='';}
+function splitLine(line){
+  if(line.includes('\t')) return line.split('\t');
+  if(line.includes(';')) return line.split(';');
+  if((line.match(/,/g)||[]).length===1 && !/\d,\d{3}(\D|$)/.test(line)) return line.split(',');
+  if(line.includes(',')) return line.split(',');
+  return line.trim().split(/\s+/);
+}
+function readInput(){
+  const lines=$('data').value.replace(/\r/g,'').split('\n');
+  while(lines.length && lines[lines.length-1].trim()==='') lines.pop();
+  const obs=[],sim=[];let skipped=0;
+  lines.forEach((ln,i)=>{
+    const p=splitLine(ln);
+    const a=(p[0]||'').trim(), b=(p[1]||'').trim();
+    if(i===0 && isNaN(Number(a)) && isNaN(Number(b))) {skipped=1;return;}
+    obs.push(a);sim.push(b);
+  });
+  return {obs,sim,skipped};
+}
+function run(){
+  const msg=$('msg');msg.className='';
+  const {obs,sim}=readInput();
+  if(!obs.length){msg.className='err';msg.textContent='Please paste data first.';return;}
+  const mc=$('miss').value===''?null:Number($('miss').value);
+  let rows=pairData(obs,sim,mc);
+  if(!$('neg').checked){ // re-admit negatives except the missing code
+    rows=rows.map((r,i)=>{const v=Number(String(obs[i]).replace(/,/g,''));if(r.o===null&&String(obs[i]).trim()!==''&&isFinite(v)&&v<0&&v!==mc)r.o=v;return r;});
+  }
+  const m=computeMetrics(rows);
+  if(m.error){msg.className='err';msg.textContent=m.error;$('results').style.display='none';return;}
+  m.intercept=mean(rows.filter(r=>r.o!==null&&r.s!==null).map(r=>r.s))-m.slope*mean(rows.filter(r=>r.o!==null&&r.s!==null).map(r=>r.o));
+  const missing=rows.filter(r=>r.o===null).length, noSim=rows.filter(r=>r.o!==null&&r.s===null).length;
+  msg.className='ok';msg.textContent=`✔ ${rows.length} time steps read · ${m.n} valid pairs used · ${missing} missing observed excluded`+(noSim?` · ${noSim} rows without simulated value excluded`:'');
+  LAST={rows,m};
+  render(rows,m);
+}
+function rateNSE(v){return v>0.75?['Very good','VG']:v>0.65?['Good','G']:v>0.5?['Satisfactory','S']:['Unsatisfactory','U'];}
+function ratePB(v){const a=Math.abs(v);return a<10?['Very good','VG']:a<15?['Good','G']:a<25?['Satisfactory','S']:['Unsatisfactory','U'];}
+function pbias(m){return $('moriasi').checked?-m.PBIAS:m.PBIAS;}
+function fmt(v,d){return v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});}
+function render(rows,m){
+  $('results').style.display='block';
+  $('npts').textContent=`(n = ${m.n} valid pairs)`;
+  const pb=pbias(m), rn=rateNSE(m.NSE), rp=ratePB(pb);
+  const dir=$('moriasi').checked?(pb<0?'overestimation':'underestimation'):(pb>0?'overestimation':'underestimation');
+  const k=[['NSE',fmt(m.NSE,3),`<span class="${rn[1]}">${rn[0]}</span>`],['RMSE (m³/s)',fmt(m.RMSE,2),'ideal 0'],['R²',fmt(m.R2,3),'ideal 1'],['KGE',fmt(m.KGE,3),'ideal 1'],
+   ['PBIAS (%)',fmt(pb,2),`<span class="${rp[1]}">${rp[0]}</span> · ${dir}`],['Index of Agreement',fmt(m.d,3),'ideal 1'],['Pearson r',fmt(m.r,3),'ideal 1'],['Valid pairs',m.n,'']];
+  $('kpis').innerHTML=k.map(x=>`<div class="kpi"><div class="l">${x[0]}</div><div class="v">${x[1]}</div><div class="r">${x[2]}</div></div>`).join('');
+  const P=rows.filter(r=>r.o!==null&&r.s!==null);
+  const C=[];
+  C.push(chart('Hydrograph – NSE = '+fmt(m.NSE,3),'Time step','Discharge (m³/s)',{lines:[
+    {name:'Observed',color:'var(--obs)',pts:rows.map(r=>r.o===null?null:[r.t,r.o])},
+    {name:'Simulated',color:'var(--sim)',pts:rows.map(r=>r.s===null?null:[r.t,r.s])}]}));
+  C.push(chart('Residuals (Sim − Obs) – RMSE = '+fmt(m.RMSE,1)+' m³/s','Time step','Residual (m³/s)',{bars:P.map(r=>[r.t,r.s-r.o]),zero:true}));
+  const mx=Math.max(...P.map(r=>Math.max(r.o,r.s)));
+  C.push(chart('Simulated vs Observed – R² = '+fmt(m.R2,3),'Observed (m³/s)','Simulated (m³/s)',{scatter:P.map(r=>[r.o,r.s]),
+    lines:[{name:`Fit: y = ${fmt(m.slope,3)}x ${m.intercept>=0?'+':'−'} ${fmt(Math.abs(m.intercept),2)}`,color:'#333',dash:true,pts:[[0,m.intercept],[mx,m.slope*mx+m.intercept]]}],square:true}));
+  C.push(chart('1:1 Plot – Index of Agreement d = '+fmt(m.d,3),'Observed (m³/s)','Simulated (m³/s)',{scatter:P.map(r=>[r.o,r.s]),
+    lines:[{name:'1:1 line',color:'var(--sim)',pts:[[0,0],[mx,mx]]}],square:true}));
+  C.push(chart('KGE components – KGE = '+fmt(m.KGE,3),'','Ratio',{cat:[['r',m.r],['α (variability)',m.alpha],['β (bias)',m.beta]],ideal:1}));
+  C.push(chart('Total volume – PBIAS = '+fmt(pb,1)+'%','','Sum of discharge (m³/s)',{cat:[['Observed',m.sumO],['Simulated',m.sumS]],colors:['var(--obs)','var(--sim)']}));
+  $('charts').innerHTML=C.map((s,i)=>`<div class="chart">${s}<div class="dl noprint"><a onclick="dlSVG(${i})">Download chart (SVG)</a></div></div>`).join('');
+}
+function niceTicks(lo,hi,n=6){if(lo===hi){hi=lo+1;}const span=hi-lo,step0=span/n,mag=Math.pow(10,Math.floor(Math.log10(step0))),f=step0/mag;
+  const step=(f<1.5?1:f<3?2:f<7?5:10)*mag;const a=Math.floor(lo/step)*step,b=Math.ceil(hi/step)*step;const t=[];for(let v=a;v<=b+step/2;v+=step)t.push(+v.toPrecision(12));return t;}
+function tl(v){const a=Math.abs(v);return a>=1000?v.toLocaleString('en-US',{maximumFractionDigits:0}):a>=10?v.toFixed(0):a>=1?v.toFixed(1):v.toFixed(2);}
+function chart(title,xl,yl,o){
+  const W=560,H=360,L=72,R=18,T=40,B=o.cat?70:78;const pw=W-L-R,ph=H-T-B;
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" font-family="Segoe UI,Arial" font-size="12"><rect width="${W}" height="${H}" fill="#fff"/>`;
+  svg+=`<text x="${W/2}" y="22" text-anchor="middle" font-size="15" fill="#1F4E78" font-weight="bold">${esc(title)}</text>`;
+  if(o.cat){
+    const vals=o.cat.map(c=>c[1]).concat(o.ideal?[o.ideal]:[]);const yt=niceTicks(Math.min(0,...vals),Math.max(...vals));
+    const y0=yt[0],y1=yt[yt.length-1],Y=v=>T+ph-(v-y0)/(y1-y0)*ph;
+    yt.forEach(v=>svg+=`<line x1="${L}" x2="${L+pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e5e5e5"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end" fill="#555">${tl(v)}</text>`);
+    const bw=pw/o.cat.length;
+    o.cat.forEach((c,i)=>{const x=L+bw*i+bw*0.25,w=bw*0.5,col=o.colors?o.colors[i]:'var(--obs)';
+      svg+=`<rect x="${x}" y="${Math.min(Y(c[1]),Y(0))}" width="${w}" height="${Math.abs(Y(0)-Y(c[1]))}" fill="${col}"/>`;
+      svg+=`<text x="${x+w/2}" y="${Y(c[1])-6}" text-anchor="middle" font-weight="bold">${c[1]>=100?fmt(c[1],0):fmt(c[1],3)}</text>`;
+      svg+=`<text x="${x+w/2}" y="${T+ph+20}" text-anchor="middle" fill="#333">${esc(c[0])}</text>`;});
+    if(o.ideal!==undefined){svg+=`<line x1="${L}" x2="${L+pw}" y1="${Y(o.ideal)}" y2="${Y(o.ideal)}" stroke="#C00000" stroke-dasharray="6,4" stroke-width="2"/><text x="${L+pw-4}" y="${Y(o.ideal)-5}" text-anchor="end" fill="#C00000">Ideal = ${o.ideal}</text>`;}
+  } else {
+    let xs=[],ys=[];
+    (o.lines||[]).forEach(l=>l.pts.forEach(p=>{if(p){xs.push(p[0]);ys.push(p[1]);}}));
+    (o.scatter||[]).forEach(p=>{xs.push(p[0]);ys.push(p[1]);});
+    (o.bars||[]).forEach(p=>{xs.push(p[0]);ys.push(p[1]);});
+    if(o.zero)ys.push(0);
+    let xt,yt;
+    if(o.square){const mx=Math.max(...xs,...ys);xt=yt=niceTicks(0,mx);}else{xt=niceTicks(Math.min(...xs),Math.max(...xs),8);yt=niceTicks(Math.min(0,...ys),Math.max(...ys));}
+    if(o.bars){xt=niceTicks(Math.min(...xs)-1,Math.max(...xs)+1,8);}
+    const x0=xt[0],x1=xt[xt.length-1],y0=yt[0],y1=yt[yt.length-1];
+    const X=v=>L+(v-x0)/(x1-x0)*pw,Y=v=>T+ph-(v-y0)/(y1-y0)*ph;
+    svg+=`<clipPath id="c${title.length}"><rect x="${L}" y="${T}" width="${pw}" height="${ph}"/></clipPath>`;
+    yt.forEach(v=>svg+=`<line x1="${L}" x2="${L+pw}" y1="${Y(v)}" y2="${Y(v)}" stroke="#e5e5e5"/><text x="${L-6}" y="${Y(v)+4}" text-anchor="end" fill="#555">${tl(v)}</text>`);
+    xt.forEach(v=>svg+=`<line y1="${T}" y2="${T+ph}" x1="${X(v)}" x2="${X(v)}" stroke="#f0f0f0"/><text x="${X(v)}" y="${T+ph+16}" text-anchor="middle" fill="#555">${tl(v)}</text>`);
+    if(o.zero)svg+=`<line x1="${L}" x2="${L+pw}" y1="${Y(0)}" y2="${Y(0)}" stroke="#888"/>`;
+    const g=`clip-path="url(#c${title.length})"`;
+    if(o.bars){const bw=Math.max(1,pw/(x1-x0)*0.6);o.bars.forEach(p=>svg+=`<rect ${g} x="${X(p[0])-bw/2}" y="${Math.min(Y(p[1]),Y(0))}" width="${bw}" height="${Math.abs(Y(0)-Y(p[1]))}" fill="${p[1]>=0?'#C0392B':'#2E75B6'}"/>`);}
+    (o.scatter||[]).forEach(p=>svg+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="#2E75B6" fill-opacity=".8"/>`);
+    (o.lines||[]).forEach(l=>{let d='',pen=false;const dense=l.pts.length>300;
+      l.pts.forEach(p=>{if(!p){pen=false;return;}d+=(pen?'L':'M')+X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(1);pen=true;});
+      svg+=`<path ${g} d="${d}" fill="none" stroke="${l.color}" stroke-width="2" ${l.dash?'stroke-dasharray="6,4"':''}/>`;
+      if(!dense&&!l.dash&&l.pts.length>2)l.pts.forEach(p=>{if(p)svg+=`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="2.5" fill="${l.color}"/>`;});});
+    svg+=`<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="none" stroke="#999"/>`;
+    const leg=(o.lines||[]).map(l=>[l.name,l.color,l.dash]).concat(o.scatter?[['Simulated vs observed','#2E75B6','dot']]:[]).concat(o.bars?[['Over (+)','#C0392B','box'],['Under (−)','#2E75B6','box']]:[]);
+    let lx=L;leg.forEach(e=>{const ly=H-14;svg+=e[2]==='dot'?`<circle cx="${lx+8}" cy="${ly-4}" r="4" fill="${e[1]}"/>`:e[2]==='box'?`<rect x="${lx+2}" y="${ly-10}" width="12" height="10" fill="${e[1]}"/>`:`<line x1="${lx}" x2="${lx+18}" y1="${ly-4}" y2="${ly-4}" stroke="${e[1]}" stroke-width="2" ${e[2]?'stroke-dasharray="5,3"':''}/>`;
+      svg+=`<text x="${lx+24}" y="${ly}" fill="#333">${esc(e[0])}</text>`;lx+=34+e[0].length*6.5;});
+    svg+=`<text x="${L+pw/2}" y="${T+ph+36}" text-anchor="middle" fill="#333">${esc(xl)}</text>`;
+  }
+  svg+=`<text transform="translate(16,${T+ph/2}) rotate(-90)" text-anchor="middle" fill="#333">${esc(yl)}</text></svg>`;
+  return svg.replace(/var\(--obs\)/g,'#2E75B6').replace(/var\(--sim\)/g,'#C0392B');
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function dlSVG(i){const s=document.querySelectorAll('.chart svg')[i].outerHTML;save(new Blob([s],{type:'image/svg+xml'}),`chart_${i+1}.svg`);}
+function save(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function downloadCSV(){if(!LAST)return;const m=LAST.m,pb=pbias(m);
+  let s='Metric,Value\n'+[['NSE',m.NSE],['RMSE (m3/s)',m.RMSE],['R2',m.R2],['KGE',m.KGE],['KGE r',m.r],['KGE alpha',m.alpha],['KGE beta',m.beta],[($('moriasi').checked?'PBIAS % (Obs-Sim)':'PBIAS % (Sim-Obs)'),pb],['Index of Agreement d',m.d],['Pearson r',m.r],['Valid pairs',m.n]].map(x=>x.join(',')).join('\n');
+  s+='\n\nTime step,Observed,Simulated,Residual (Sim-Obs),Used\n'+LAST.rows.map(r=>[r.t,r.o??'',r.s??'',(r.o!==null&&r.s!==null)?(r.s-r.o):'',(r.o!==null&&r.s!==null)?'yes':'no'].join(',')).join('\n');
+  save(new Blob([s],{type:'text/csv'}),'model_performance_results.csv');}
+['moriasi','neg','miss'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{if(LAST)run();}));
+</script>
+</body>
+</html>
